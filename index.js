@@ -41,46 +41,41 @@ app.get('/api/users', async (req, res) => {
   return res.send(result).status(200)
 })
 
-// Exersices endpoints
+// exercises endpoints
 
 app.post('/api/users/:_id/exercises', async (req, res) => {
+  // Params
   const { _id } = req.params
+  // Body fields
   const { description, duration, date } = req.body
-  console.log(_id)
+
   const user = await users.findOne({_id: new ObjectId(_id)})
   if(!user){
     return res.json({
       error: "User does not exist"
     })
   }
-  var exerciseDate;
-
-  const userId = user._id
-  const username = user.username
   
-
-  if (date) {
-    exerciseDate = new Date(date).toDateString()
-  }
-  else {
-    exerciseDate = new Date().toDateString()
-  }
-  const exercise = {
-    userId: _id,
-    description,
-    duration,
-    date: exerciseDate,
+  // Parse inputs
+  const durationAsNumber = Number(duration);
+  if(!description || Number.isNaN(durationAsNumber)){
+    return res.status(400).json({ error: "Invalid description or duration" });
   }
 
-  await exercises.insertOne(exercise)
-
-  let result = {
-    username,
-    description,
-    duration,
-    exerciseDate,
-    userId
+  // Date as date object
+  const dateObject = date ? new Date(date) : new Date()
+  if(isNaN(dateObject.getTime())){
+    return res.status(400).json({ error: "Invalid date" });
   }
+
+  const result = {
+    _id: user._id.toString(),
+    username: user.username,
+    date: dateObject.toDateString(),
+    duration: durationAsNumber,
+    description: String(description)
+  }
+
   return res.send(result).status(201);
 })
 
