@@ -3,6 +3,7 @@ const cors = require('cors')
 require('dotenv').config()
 const uuid = require('uuid')
 const { MongoClient } = require('mongodb')
+const { ObjectId } = require('mongodb')
 
 // MongoDB config
 const client = new MongoClient(process.env.DB_URL);
@@ -43,27 +44,79 @@ app.get('/api/users', async (req, res) => {
 // Exersices endpoints
 
 app.post('/api/users/:_id/exercises', async (req, res) => {
-  const { id } = req.params
-  const userExists = await users.findOne({_id: id})
-  if(!userExists){
+  const { _id } = req.params
+  const { description, duration, date } = req.body
+  console.log(_id)
+  const user = await users.findOne({_id: new ObjectId(_id)})
+  if(!user){
     return res.json({
       error: "User does not exist"
     })
   }
+  var exerciseDate;
+
+  const userId = user._id
+  const username = user.username
   
-  const { description, duration, date } = req.body
-  if (!date) {
-    let date = new Date()
+
+  if (date) {
+    exerciseDate = new Date(date).toDateString()
+  }
+  else {
+    exerciseDate = new Date().toDateString()
   }
   const exercise = {
-    id,
+    userId: _id,
     description,
     duration,
-    date
+    date: exerciseDate,
   }
 
-  result = exercises.insertOne(exercise)
+  await exercises.insertOne(exercise)
+
+  let result = {
+    username,
+    description,
+    duration,
+    exerciseDate,
+    userId
+  }
   return res.send(result).status(201);
+})
+
+// Logs endpoints
+app.get('/api/users/:_id/logs', async (req, res) => {
+  const { _id } = req.params
+  const { from, to, limit } = req.query
+  const user = await users.findOne({_id: new ObjectId(_id)})
+  if(!user){
+    return res.json({error: 'User does not exist'})
+  }
+  const userId = user._id
+  const username = user.username
+  let query = { userId: _id}
+
+  if(from || to) {
+    query.date = {}
+    if (from) query.date.$gte = new Date(from)
+    if (to) query.date.$lte = new Date(to)
+  }
+
+  let exercisesQuery = await exercises.find(query)
+  if(limit){
+    exercisesQuery = await exercisesQuery.limit(parseInt(limit))
+  }
+
+  const logArray = await exercisesQuery.toArray()
+
+  result = {
+    username,
+    count,
+    _id: userId,
+    log: logArray
+  }
+
+  return res.send(result).status(200)
 })
 
 
