@@ -81,37 +81,59 @@ app.post('/api/users/:_id/exercises', async (req, res) => {
 
 // Logs endpoints
 app.get('/api/users/:_id/logs', async (req, res) => {
+  // Params
   const { _id } = req.params
+  // Queries
   const { from, to, limit } = req.query
+  // Check user on database
   const user = await users.findOne({_id: new ObjectId(_id)})
   if(!user){
     return res.json({error: 'User does not exist'})
   }
-  const userId = user._id
-  const username = user.username
-  let query = { userId: _id}
 
-  if(from || to) {
-    query.date = {}
-    if (from) query.date.$gte = new Date(from)
-    if (to) query.date.$lte = new Date(to)
+  // Search query
+  let query = { userId: new ObjectId(_id) };
+  if (from || to) {
+    const dateFilter = {};
+    if (from) {
+      const d = new Date(from);
+      if (!isNaN(d.getTime())) dateFilter.$gte = d;
+    }
+    if (to) {
+      const d = new Date(to);
+      if (!isNaN(d.getTime())) dateFilter.$lte = d;
+    }
+    if (Object.keys(dateFilter).length) query.date = dateFilter;
   }
 
-  let exercisesQuery = await exercises.find(query)
-  if(limit){
-    exercisesQuery = await exercisesQuery.limit(parseInt(limit))
+  // Limit
+  let cursor = exercises.find(query).sort({ date: 1 });
+  if (limit) {
+    const n = parseInt(limit, 10);
+    if (!Number.isNaN(n) && n > 0) cursor = cursor.limit(n);
   }
 
-  const logArray = await exercisesQuery.toArray()
+  // Map following return object instructions
+  const rows = await cursor.toArray();
+  const log = rows.map((exercise) => ({
+    description: exercise.description,
+    duration: Number(exercise.duration),
+    date: new Date(exercise.date).toDateString(),
+  }));
 
-  result = {
-    username,
+  // Documents count
+  const count = log.length;
+
+  const result = {
+    _id: user._id.toString(),
+    username: user.username,
     count,
-    _id: userId,
-    log: logArray
-  }
+    log,
+  };
 
-  return res.send(result).status(200)
+  console.log(result);
+
+  return res.status(200).json(result);
 })
 
 
